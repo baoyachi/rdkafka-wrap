@@ -8,8 +8,8 @@ mod wrap_err;
 mod wrap_ext;
 mod wrap_producer;
 
+pub use rdkafka::*;
 pub use wrap_consumer::*;
 pub use wrap_err::*;
 pub use wrap_ext::*;
 pub use wrap_producer::*;
-pub use rdkafka::*;
