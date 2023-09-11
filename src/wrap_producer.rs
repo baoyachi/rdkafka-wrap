@@ -35,8 +35,27 @@ impl KWProducerConf {
         self.msg_timeout = msg_timeout.into();
     }
 
-    pub fn set_config(mut self, config: HashMap<String, String>) -> Self {
+    pub fn set_config<K, V>(mut self, config: HashMap<K, V>) -> Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        let config = config
+            .into_iter()
+            .fold(HashMap::new(), |mut map, (key, value)| {
+                map.insert(key.into(), value.into());
+                map
+            });
         self.config = config;
+        self
+    }
+
+    pub fn append_config<K, V>(mut self, key: K, value: V) -> Self
+    where
+        K: Into<String>,
+        V: Into<String>,
+    {
+        self.config.insert(key.into(), value.into());
         self
     }
 }
@@ -49,7 +68,7 @@ pub struct KWProducer {
 }
 
 impl KWProducer {
-    pub fn new_tp(conf: KWProducerConf) -> KWResult<KWProducer> {
+    pub fn new_hp(conf: KWProducerConf) -> KWResult<KWProducer> {
         let mut client = ClientConfig::new();
         client.set(BOOTSTRAP_SERVERS, &conf.brokers);
 
