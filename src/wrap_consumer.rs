@@ -68,6 +68,11 @@ impl KWConsumerConf {
         self.config.insert(key.into(), value.into());
         self
     }
+
+    pub fn set_log_level(mut self, log_level: RDKafkaLogLevel) -> Self {
+        self.log_level = Some(log_level);
+        self
+    }
 }
 
 pub struct KWConsumer {

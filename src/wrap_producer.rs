@@ -58,6 +58,11 @@ impl KWProducerConf {
         self.config.insert(key.into(), value.into());
         self
     }
+
+    pub fn set_log_level(mut self, log_level: RDKafkaLogLevel) -> Self {
+        self.log_level = Some(log_level);
+        self
+    }
 }
 
 pub struct KWProducer {
@@ -68,7 +73,7 @@ pub struct KWProducer {
 }
 
 impl KWProducer {
-    pub fn new_hp(conf: KWProducerConf) -> KWResult<KWProducer> {
+    pub fn new(conf: KWProducerConf) -> KWResult<KWProducer> {
         let mut client = ClientConfig::new();
         client.set(BOOTSTRAP_SERVERS, &conf.brokers);
 
