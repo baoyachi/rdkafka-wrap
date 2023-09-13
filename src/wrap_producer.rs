@@ -6,6 +6,7 @@ use rdkafka::admin::AdminClient;
 use rdkafka::client::DefaultClientContext;
 use rdkafka::config::RDKafkaLogLevel;
 use rdkafka::error::KafkaError;
+use rdkafka::message::ToBytes;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext};
 use rdkafka::util::Timeout;
 use rdkafka::ClientConfig;
@@ -90,13 +91,14 @@ impl KWProducer {
         })
     }
 
-    pub async fn send<'a>(
+    pub async fn send<'a, K, P>(
         &'a self,
-        payload: &'a [u8],
-        key: &'a [u8],
-    ) -> Result<(), (KafkaError, BaseRecord<'a, [u8], [u8]>)> {
-        let record = BaseRecord::to(&self.conf.topic).key(key).payload(payload);
-
+        record: BaseRecord<'a, K, P>,
+    ) -> Result<(), (KafkaError, BaseRecord<'a, K, P>)>
+    where
+        K: ToBytes + ?Sized,
+        P: ToBytes + ?Sized,
+    {
         self.producer.send(record, self.conf.msg_timeout).await?;
         Ok(())
     }
