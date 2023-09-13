@@ -10,6 +10,7 @@ use rdkafka::producer::{BaseRecord, DefaultProducerContext};
 use rdkafka::util::Timeout;
 use rdkafka::ClientConfig;
 use std::collections::HashMap;
+use rdkafka::message::ToBytes;
 use tokio::sync::Mutex;
 
 pub struct KWProducerConf {
@@ -36,9 +37,9 @@ impl KWProducerConf {
     }
 
     pub fn set_config<K, V>(mut self, config: HashMap<K, V>) -> Self
-    where
-        K: Into<String>,
-        V: Into<String>,
+        where
+            K: Into<String>,
+            V: Into<String>,
     {
         let config = config
             .into_iter()
@@ -51,9 +52,9 @@ impl KWProducerConf {
     }
 
     pub fn append_config<K, V>(mut self, key: K, value: V) -> Self
-    where
-        K: Into<String>,
-        V: Into<String>,
+        where
+            K: Into<String>,
+            V: Into<String>,
     {
         self.config.insert(key.into(), value.into());
         self
@@ -90,14 +91,16 @@ impl KWProducer {
         })
     }
 
-    pub async fn send<'a>(
+    pub async fn send<'a, K, P>(
         &'a self,
-        payload: &'a [u8],
-        key: &'a [u8],
-    ) -> Result<(), (KafkaError, BaseRecord<'a, [u8], [u8]>)> {
-        let record = BaseRecord::to(&self.conf.topic).key(key).payload(payload);
-
+        record: BaseRecord<'a, K, P>,
+    ) -> Result<(), (KafkaError, BaseRecord<'a, K, P>)>
+        where
+            K: ToBytes + ?Sized,
+            P: ToBytes + ?Sized,
+    {
         self.producer.send(record, self.conf.msg_timeout).await?;
         Ok(())
     }
 }
+
