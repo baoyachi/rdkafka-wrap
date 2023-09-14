@@ -2,10 +2,10 @@ use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::hp_producer::HpProducer;
 use crate::wrap_err::KWResult;
 
+use crate::wrap_ext::SafeAdminClient;
 use crate::{KWError, OptionExt};
 use anyhow::anyhow;
-use rdkafka::admin::{AdminClient, NewTopic};
-use rdkafka::client::DefaultClientContext;
+use rdkafka::admin::NewTopic;
 use rdkafka::config::RDKafkaLogLevel;
 use rdkafka::error::KafkaError;
 use rdkafka::message::ToBytes;
@@ -81,7 +81,7 @@ pub struct KWProducer {
     pub conf: KWProducerConf,
     //TODO Context callback issue to be resolved
     pub producer: HpProducer<DefaultProducerContext>,
-    pub admin_client: Mutex<Option<AdminClient<DefaultClientContext>>>,
+    pub admin_client: Mutex<Option<SafeAdminClient>>,
 }
 
 impl KWProducer {

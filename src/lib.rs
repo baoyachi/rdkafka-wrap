@@ -3,9 +3,11 @@ extern crate log;
 
 pub mod configuration;
 pub mod hp_producer;
+pub mod wrap_conf;
 mod wrap_consumer;
 mod wrap_err;
 mod wrap_ext;
+mod wrap_metadata;
 mod wrap_producer;
 
 pub use rdkafka::*;

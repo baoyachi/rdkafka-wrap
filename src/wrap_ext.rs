@@ -1,12 +1,18 @@
 use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::wrap_err::KWResult;
+use crate::wrap_metadata::{MetadataTopicWrap, MetadataWrap};
 use crate::{KWConsumer, KWProducer};
 use anyhow::anyhow;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic};
 use rdkafka::client::DefaultClientContext;
 use rdkafka::config::{FromClientConfig, RDKafkaLogLevel};
 use rdkafka::error::RDKafkaErrorCode;
-use rdkafka::ClientConfig;
+use rdkafka::util::Timeout;
+use rdkafka::{ClientConfig, ClientContext};
+use std::sync::Arc;
+use std::time::Duration;
+
+pub(crate) type SafeAdminClient = Arc<AdminClient<DefaultClientContext>>;
 
 #[async_trait::async_trait]
 pub trait OptionExt {
@@ -25,6 +31,18 @@ pub trait OptionExt {
 
     fn get_brokers(&self) -> &str;
     fn get_log_level(&self) -> RDKafkaLogLevel;
+
+    async fn get_admin_client(&self) -> KWResult<SafeAdminClient>;
+
+    async fn get_topics<C: ClientContext>(&self) -> KWResult<Vec<MetadataTopicWrap>> {
+        let metadata: MetadataWrap = self
+            .get_admin_client()
+            .await?
+            .inner()
+            .fetch_metadata(None, Timeout::from(Duration::from_secs(5)))?
+            .into();
+        Ok(metadata.topics)
+    }
 }
 
 #[async_trait::async_trait]
@@ -35,13 +53,7 @@ impl OptionExt for KWProducer {
     where
         I: IntoIterator<Item = &'a NewTopic<'a>> + Send,
     {
-        let mut guard = self.admin_client.lock().await;
-        if guard.is_none() {
-            let client = self.create_admin_client()?;
-            *guard = Some(client);
-        }
-
-        let admin_client = guard.as_ref().unwrap();
+        let admin_client = self.get_admin_client().await?;
 
         let topics_result = admin_client
             .create_topics(topics, &AdminOptions::new())
@@ -74,6 +86,16 @@ impl OptionExt for KWProducer {
 
     fn get_log_level(&self) -> RDKafkaLogLevel {
         self.conf.log_level.unwrap_or(RDKafkaLogLevel::Error)
+    }
+
+    async fn get_admin_client(&self) -> KWResult<SafeAdminClient> {
+        let mut guard = self.admin_client.lock().await;
+        if guard.is_none() {
+            let client = self.create_admin_client()?;
+            *guard = Some(Arc::new(client));
+        }
+
+        Ok(guard.clone().unwrap())
     }
 }
 
@@ -85,13 +107,7 @@ impl OptionExt for KWConsumer {
     where
         I: IntoIterator<Item = &'a NewTopic<'a>> + Send,
     {
-        let mut guard = self.admin_client.lock().await;
-        if guard.is_none() {
-            let client = self.create_admin_client()?;
-            *guard = Some(client);
-        }
-
-        let admin_client = guard.as_ref().unwrap();
+        let admin_client = self.get_admin_client().await?;
 
         let topics_result = admin_client
             .create_topics(topics, &AdminOptions::new())
@@ -124,5 +140,15 @@ impl OptionExt for KWConsumer {
 
     fn get_log_level(&self) -> RDKafkaLogLevel {
         self.conf.log_level.unwrap_or(RDKafkaLogLevel::Error)
+    }
+
+    async fn get_admin_client(&self) -> KWResult<SafeAdminClient> {
+        let mut guard = self.admin_client.lock().await;
+        if guard.is_none() {
+            let client = self.create_admin_client()?;
+            *guard = Some(Arc::new(client));
+        }
+
+        Ok(guard.clone().unwrap())
     }
 }

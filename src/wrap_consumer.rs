@@ -1,9 +1,8 @@
 use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::configuration::consumer::GROUP_ID;
 use crate::wrap_err::KWResult;
+use crate::wrap_ext::SafeAdminClient;
 use anyhow::anyhow;
-use rdkafka::admin::AdminClient;
-use rdkafka::client::DefaultClientContext;
 use rdkafka::config::RDKafkaLogLevel;
 use rdkafka::consumer::stream_consumer::StreamPartitionQueue;
 use rdkafka::consumer::{Consumer, DefaultConsumerContext, StreamConsumer};
@@ -78,7 +77,7 @@ impl KWConsumerConf {
 pub struct KWConsumer {
     pub conf: KWConsumerConf,
     pub consumer: Arc<StreamConsumer<DefaultConsumerContext>>,
-    pub admin_client: Mutex<Option<AdminClient<DefaultClientContext>>>,
+    pub admin_client: Mutex<Option<SafeAdminClient>>,
 }
 
 impl KWConsumer {
