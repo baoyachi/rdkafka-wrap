@@ -2,12 +2,15 @@ use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::hp_producer::HpProducer;
 use crate::wrap_err::KWResult;
 
-use rdkafka::admin::AdminClient;
+use crate::{KWError, OptionExt};
+use anyhow::anyhow;
+use rdkafka::admin::{AdminClient, NewTopic};
 use rdkafka::client::DefaultClientContext;
 use rdkafka::config::RDKafkaLogLevel;
 use rdkafka::error::KafkaError;
 use rdkafka::message::ToBytes;
 use rdkafka::producer::{BaseRecord, DefaultProducerContext};
+use rdkafka::types::RDKafkaErrorCode;
 use rdkafka::util::Timeout;
 use rdkafka::ClientConfig;
 use std::collections::HashMap;
@@ -19,6 +22,7 @@ pub struct KWProducerConf {
     pub brokers: String,
     pub topic: String,
     pub msg_timeout: Timeout,
+    pub create_topic_conf: Option<NewTopic<'static>>,
 }
 
 impl KWProducerConf {
@@ -29,6 +33,7 @@ impl KWProducerConf {
             brokers: brokers.to_string(),
             topic: topic.to_string(),
             msg_timeout: Timeout::Never,
+            create_topic_conf: None,
         }
     }
 
@@ -64,6 +69,12 @@ impl KWProducerConf {
         self.log_level = Some(log_level);
         self
     }
+
+    pub fn set_create_topic_conf<'a>(mut self, topic: NewTopic<'a>) -> Self {
+        let topic = unsafe { std::mem::transmute::<NewTopic<'a>, NewTopic<'_>>(topic) };
+        self.create_topic_conf = Some(topic);
+        self
+    }
 }
 
 pub struct KWProducer {
@@ -94,12 +105,35 @@ impl KWProducer {
     pub async fn send<'a, K, P>(
         &'a self,
         record: BaseRecord<'a, K, P>,
-    ) -> Result<(), (KafkaError, BaseRecord<'a, K, P>)>
+    ) -> Result<(), (KWError, Option<BaseRecord<'a, K, P>>)>
     where
         K: ToBytes + ?Sized,
         P: ToBytes + ?Sized,
     {
-        self.producer.send(record, self.conf.msg_timeout).await?;
+        match self.producer.send(record, self.conf.msg_timeout).await {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err((e, record)) => {
+                if self.conf.create_topic_conf.is_some()
+                    && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
+                {
+                    let topic = self.conf.create_topic_conf.as_ref().ok_or_else(|| {
+                        (
+                            anyhow!("lost topic:{} config", self.conf.topic).into(),
+                            None,
+                        )
+                    })?;
+                    self.create_topic([topic]).await.map_err(|e| (e, None))?;
+                    self.producer
+                        .send(record, self.conf.msg_timeout)
+                        .await
+                        .map_err(|(e, record)| (e.into(), Some(record)))?;
+                } else {
+                    return Err((e.into(), Some(record)));
+                }
+            }
+        }
         Ok(())
     }
 }
