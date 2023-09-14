@@ -1,6 +1,7 @@
 use rdkafka::error::RDKafkaErrorCode;
 use rdkafka::metadata::{Metadata, MetadataBroker, MetadataPartition, MetadataTopic};
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MetadataWrap {
     pub orig_broker_id: i32,
     pub orig_broker_name: String,
@@ -19,6 +20,7 @@ impl From<Metadata> for MetadataWrap {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MetadataBrokerWrap {
     pub id: i32,
     pub host: String,
@@ -35,9 +37,11 @@ impl<'a> From<&'a MetadataBroker> for MetadataBrokerWrap {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MetadataTopicWrap {
     pub name: String,
     pub partitions: Vec<MetadataPartitionWrap>,
+    #[serde(skip)]
     pub error: Option<RDKafkaErrorCode>,
 }
 
@@ -51,12 +55,14 @@ impl<'a> From<&'a MetadataTopic> for MetadataTopicWrap {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MetadataPartitionWrap {
     // the id of the partition.
     pub id: i32,
     // the broker id of the leader broker for the partition.
     pub leader: i32,
     // the metadata error for the partition, or None if there is no error.
+    #[serde(skip)]
     pub error: Option<RDKafkaErrorCode>,
     // the broker IDs of the replicas.
     pub replicas: Vec<i32>,
