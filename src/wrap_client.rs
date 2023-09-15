@@ -16,7 +16,7 @@ pub struct KWClient {
 }
 
 impl KWClient {
-    fn new<B, K, V>(
+    fn new<B>(
         brokers: B,
         kw_producer: KWProducer,
         kw_consumer: KWConsumer,
@@ -24,8 +24,6 @@ impl KWClient {
     ) -> KWResult<Self>
     where
         B: AsRef<str>,
-        K: Into<String>,
-        V: Into<String>,
     {
         let log_level = log_level.get_or_init();
         let brokers = brokers.as_ref();
@@ -53,7 +51,7 @@ impl KWClient {
 
     pub fn set_log_level(mut self, log_level: RDKafkaLogLevel) -> Self {
         self.kw_producer.conf.log_level = Some(log_level);
-        for (_, mut consumer) in &mut self.kw_consumer {
+        for consumer in self.kw_consumer.values_mut() {
             consumer.conf.log_level = Some(log_level);
         }
         self.log_level = log_level;
