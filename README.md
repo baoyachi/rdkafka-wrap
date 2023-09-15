@@ -14,7 +14,7 @@
 
 ## Highlighted features
 * 100% compatible with [rdkafka](https://crates.io/crates/rdkafka)
-* Supporting the functionality of HpProducer, harnessing the dual advantages of ThreadedProducer and FutureProducer, enhances performance and strengthens retry capabilities.
+* Supporting the functionality of [HpProducer](https://docs.rs/rdkafka-wrap/latest/rdkafka_wrap/hp_producer/struct.HpProducer.html), harnessing the dual advantages of ThreadedProducer and FutureProducer, enhances performance and strengthens retry capabilities.
 * Supporting out-of-the-box shortcuts, eliminating the need for complex rdkafka configurations,also making it easy to access.
 * Supporting serialization and deserialization of results obtained from key objects without the need to repackage the original rdkafka objects.
 * Supporting for automatic topic creation.
