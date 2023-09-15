@@ -18,6 +18,9 @@
 * Supporting out-of-the-box shortcuts, eliminating the need for complex rdkafka configurations.
 * Supporting serialization and deserialization of results obtained from key objects without the need to repackage the original rdkafka objects.
 * Supporting for automatic topic creation.
+* Supports the separation and combined usage of producer and consumer objects.
+* Supports configuration transparency for producer and consumer objects, making it easy to access.
+
 
 ## Hotly anticipated features coming soon...
 - [ ] Support out-of-the-box operations for popular web frameworks to access key Kafka information.
