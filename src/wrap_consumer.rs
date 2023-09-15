@@ -2,6 +2,7 @@ use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::configuration::consumer::GROUP_ID;
 use crate::wrap_err::KWResult;
 use crate::wrap_ext::SafeAdminClient;
+use crate::LogWrapExt;
 use anyhow::anyhow;
 use rdkafka::config::RDKafkaLogLevel;
 use rdkafka::consumer::stream_consumer::StreamPartitionQueue;
@@ -16,21 +17,27 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 
+pub type GroupID = String;
+
 pub struct KWConsumerConf {
     pub config: HashMap<String, String>,
     pub log_level: Option<RDKafkaLogLevel>,
-    pub group_id: String,
+    pub group_id: GroupID,
     pub brokers: String,
     pub topics: Vec<String>,
 }
 
 impl KWConsumerConf {
-    pub fn new(brokers: &str, group_id: &str) -> Self {
+    pub fn new<B, G>(brokers: B, group_id: G) -> Self
+    where
+        B: AsRef<str>,
+        G: AsRef<str>,
+    {
         Self {
             config: Default::default(),
             log_level: None,
-            group_id: group_id.to_string(),
-            brokers: brokers.to_string(),
+            group_id: group_id.as_ref().to_string(),
+            brokers: brokers.as_ref().to_string(),
             topics: vec![],
         }
     }
@@ -92,13 +99,17 @@ impl KWConsumer {
         }
 
         let consumer: StreamConsumer<_> = client
-            .set_log_level(conf.log_level.unwrap_or(RDKafkaLogLevel::Warning))
+            .set_log_level(conf.log_level.get_or_init())
             .create()?;
         Ok(Self {
             conf,
             consumer: Arc::new(consumer),
             admin_client: Default::default(),
         })
+    }
+
+    pub fn get_group_id(&self) -> &str {
+        self.conf.group_id.as_str()
     }
 
     pub fn new_subscribe(conf: KWConsumerConf) -> KWResult<Self> {

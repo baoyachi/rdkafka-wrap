@@ -3,7 +3,7 @@ use crate::hp_producer::HpProducer;
 use crate::wrap_err::KWResult;
 
 use crate::wrap_ext::SafeAdminClient;
-use crate::{KWError, OptionExt};
+use crate::{KWError, LogWrapExt, OptionExt};
 use anyhow::anyhow;
 use rdkafka::admin::NewTopic;
 use rdkafka::config::RDKafkaLogLevel;
@@ -20,18 +20,19 @@ pub struct KWProducerConf {
     pub config: HashMap<String, String>,
     pub log_level: Option<RDKafkaLogLevel>,
     pub brokers: String,
-    pub topic: String,
     pub msg_timeout: Timeout,
     pub create_topic_conf: Option<NewTopic<'static>>,
 }
 
 impl KWProducerConf {
-    pub fn new(brokers: &str, topic: &str) -> Self {
+    pub fn new<B>(brokers: B) -> Self
+    where
+        B: AsRef<str>,
+    {
         Self {
             config: Default::default(),
             log_level: None,
-            brokers: brokers.to_string(),
-            topic: topic.to_string(),
+            brokers: brokers.as_ref().to_string(),
             msg_timeout: Timeout::Never,
             create_topic_conf: None,
         }
@@ -93,7 +94,7 @@ impl KWProducer {
             client.set(key, value);
         }
         let producer = client
-            .set_log_level(conf.log_level.unwrap_or(RDKafkaLogLevel::Warning))
+            .set_log_level(conf.log_level.get_or_init())
             .create()?;
         Ok(Self {
             conf,
@@ -110,6 +111,7 @@ impl KWProducer {
         K: ToBytes + ?Sized,
         P: ToBytes + ?Sized,
     {
+        let topic = record.topic;
         match self.producer.send(record, self.conf.msg_timeout).await {
             Ok(_) => {
                 return Ok(());
@@ -118,12 +120,11 @@ impl KWProducer {
                 if self.conf.create_topic_conf.is_some()
                     && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
                 {
-                    let topic = self.conf.create_topic_conf.as_ref().ok_or_else(|| {
-                        (
-                            anyhow!("lost topic:{} config", self.conf.topic).into(),
-                            None,
-                        )
-                    })?;
+                    let topic = self
+                        .conf
+                        .create_topic_conf
+                        .as_ref()
+                        .ok_or_else(|| (anyhow!("lost topic:{} config", topic).into(), None))?;
                     self.create_topic([topic]).await.map_err(|e| (e, None))?;
                     self.producer
                         .send(record, self.conf.msg_timeout)

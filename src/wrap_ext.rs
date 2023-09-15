@@ -1,7 +1,7 @@
 use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::wrap_err::KWResult;
 use crate::wrap_metadata::{MetadataTopicWrap, MetadataWrap};
-use crate::{KWConsumer, KWProducer};
+use crate::{KWConsumer, KWProducer, LogWrapExt};
 use anyhow::anyhow;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic};
 use rdkafka::client::DefaultClientContext;
@@ -13,6 +13,65 @@ use std::sync::Arc;
 use std::time::Duration;
 
 pub(crate) type SafeAdminClient = Arc<AdminClient<DefaultClientContext>>;
+pub type TopicName = String;
+pub type Brokers<'a> = &'a str;
+
+pub mod log_wrap {
+    use rdkafka::config::RDKafkaLogLevel;
+
+    pub trait LogWrapExt: Sized {
+        type Item;
+        fn default() -> Self::Item;
+        fn get_or_init(&self) -> Self::Item;
+    }
+
+    impl LogWrapExt for RDKafkaLogLevel {
+        type Item = Self;
+
+        fn default() -> Self::Item {
+            RDKafkaLogLevel::Warning
+        }
+
+        fn get_or_init(&self) -> Self::Item {
+            *self
+        }
+    }
+
+    impl LogWrapExt for Option<RDKafkaLogLevel> {
+        type Item = RDKafkaLogLevel;
+
+        fn default() -> Self::Item {
+            RDKafkaLogLevel::default()
+        }
+
+        fn get_or_init(&self) -> Self::Item {
+            self.unwrap_or(RDKafkaLogLevel::default())
+        }
+    }
+}
+
+pub trait AdminClientExt {
+    fn create_admin_client<T: FromClientConfig>(&self) -> KWResult<T> {
+        let admin_client = ClientConfig::new()
+            .set(BOOTSTRAP_SERVERS, self.get_brokers())
+            .set_log_level(self.get_log_level())
+            .create()?;
+        Ok(admin_client)
+    }
+
+    fn get_brokers(&self) -> &str;
+    fn get_log_level(&self) -> RDKafkaLogLevel;
+}
+
+impl<'a> AdminClientExt for (Brokers<'a>, RDKafkaLogLevel) {
+    fn get_brokers(&self) -> &str {
+        self.0
+    }
+
+    fn get_log_level(&self) -> RDKafkaLogLevel {
+        self.1
+    }
+}
 
 #[async_trait::async_trait]
 pub trait OptionExt {
@@ -22,11 +81,8 @@ pub trait OptionExt {
         I: IntoIterator<Item = &'a NewTopic<'a>> + Send;
 
     fn create_admin_client(&self) -> KWResult<Self::AdminClient> {
-        let admin_client = ClientConfig::new()
-            .set(BOOTSTRAP_SERVERS, self.get_brokers())
-            .set_log_level(self.get_log_level())
-            .create()?;
-        Ok(admin_client)
+        let ext = (self.get_brokers(), self.get_log_level());
+        ext.create_admin_client()
     }
 
     fn get_brokers(&self) -> &str;
@@ -85,7 +141,7 @@ impl OptionExt for KWProducer {
     }
 
     fn get_log_level(&self) -> RDKafkaLogLevel {
-        self.conf.log_level.unwrap_or(RDKafkaLogLevel::Error)
+        self.conf.log_level.get_or_init()
     }
 
     async fn get_admin_client(&self) -> KWResult<SafeAdminClient> {
@@ -139,7 +195,7 @@ impl OptionExt for KWConsumer {
     }
 
     fn get_log_level(&self) -> RDKafkaLogLevel {
-        self.conf.log_level.unwrap_or(RDKafkaLogLevel::Error)
+        self.conf.log_level.get_or_init()
     }
 
     async fn get_admin_client(&self) -> KWResult<SafeAdminClient> {
