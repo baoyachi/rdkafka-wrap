@@ -13,10 +13,11 @@ pub struct KWClient {
     log_level: RDKafkaLogLevel,
     pub brokers: String,
     pub create_topic_conf: HashMap<TopicName, NewTopic<'static>>,
+    pub default_topic_conf: Option<NewTopic<'static>>,
 }
 
 impl KWClient {
-    fn new<B>(
+    pub fn new<B>(
         brokers: B,
         kw_producer: KWProducer,
         kw_consumer: KWConsumer,
@@ -39,6 +40,7 @@ impl KWClient {
             create_topic_conf: Default::default(),
             log_level,
             brokers: brokers.to_string(),
+            default_topic_conf: None,
         };
         Ok(client)
     }

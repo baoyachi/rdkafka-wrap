@@ -1,7 +1,7 @@
 use crate::configuration::all::BOOTSTRAP_SERVERS;
 use crate::wrap_err::KWResult;
 use crate::wrap_metadata::{MetadataTopicWrap, MetadataWrap};
-use crate::{KWConsumer, KWProducer, LogWrapExt};
+use crate::{KWClient, KWConsumer, KWProducer, LogWrapExt};
 use anyhow::anyhow;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic};
 use rdkafka::client::DefaultClientContext;
@@ -78,7 +78,34 @@ pub trait OptionExt {
     type AdminClient: FromClientConfig;
     async fn create_topic<'a, I>(&self, topics: I) -> KWResult<()>
     where
-        I: IntoIterator<Item = &'a NewTopic<'a>> + Send;
+        I: IntoIterator<Item = &'a NewTopic<'a>> + Send,
+    {
+        let admin_client = self.get_admin_client().await?;
+
+        let topics_result = admin_client
+            .create_topics(topics, &AdminOptions::new())
+            .await?;
+
+        let mut err_msg = vec![];
+        for ret in topics_result {
+            match ret {
+                Ok(_) => {}
+                Err((topic, err_code)) => {
+                    // topic already exists
+                    if let RDKafkaErrorCode::TopicAlreadyExists = err_code {
+                        warn!("create kafka topic {}: topic already exists", topic);
+                    } else {
+                        err_msg.push(format!("topic {} -> error code: {}", topic, err_code))
+                    }
+                }
+            }
+        }
+
+        if err_msg.is_empty() {
+            return Ok(());
+        }
+        Err(anyhow!("failed to create kafka:{}", err_msg.join(",")).into())
+    }
 
     fn create_admin_client(&self) -> KWResult<Self::AdminClient> {
         let ext = (self.get_brokers(), self.get_log_level());
@@ -105,37 +132,6 @@ pub trait OptionExt {
 impl OptionExt for KWProducer {
     type AdminClient = AdminClient<DefaultClientContext>;
 
-    async fn create_topic<'a, I>(&self, topics: I) -> KWResult<()>
-    where
-        I: IntoIterator<Item = &'a NewTopic<'a>> + Send,
-    {
-        let admin_client = self.get_admin_client().await?;
-
-        let topics_result = admin_client
-            .create_topics(topics, &AdminOptions::new())
-            .await?;
-
-        let mut err_msg = vec![];
-        for ret in topics_result {
-            match ret {
-                Ok(_) => {}
-                Err((topic, err_code)) => {
-                    // topic already exists
-                    if let RDKafkaErrorCode::TopicAlreadyExists = err_code {
-                        warn!("create kafka topic {}: topic already exists", topic);
-                    } else {
-                        err_msg.push(format!("topic {} -> error code: {}", topic, err_code))
-                    }
-                }
-            }
-        }
-
-        if err_msg.is_empty() {
-            return Ok(());
-        }
-        Err(anyhow!("failed to create kafka:{}", err_msg.join(",")).into())
-    }
-
     fn get_brokers(&self) -> &str {
         self.conf.brokers.as_str()
     }
@@ -159,37 +155,6 @@ impl OptionExt for KWProducer {
 impl OptionExt for KWConsumer {
     type AdminClient = AdminClient<DefaultClientContext>;
 
-    async fn create_topic<'a, I>(&self, topics: I) -> KWResult<()>
-    where
-        I: IntoIterator<Item = &'a NewTopic<'a>> + Send,
-    {
-        let admin_client = self.get_admin_client().await?;
-
-        let topics_result = admin_client
-            .create_topics(topics, &AdminOptions::new())
-            .await?;
-
-        let mut err_msg = vec![];
-        for ret in topics_result {
-            match ret {
-                Ok(_) => {}
-                Err((topic, err_code)) => {
-                    // topic already exists
-                    if let RDKafkaErrorCode::TopicAlreadyExists = err_code {
-                        warn!("create kafka topic {}: topic already exists", topic);
-                    } else {
-                        err_msg.push(format!("topic {} -> error code: {}", topic, err_code))
-                    }
-                }
-            }
-        }
-
-        if err_msg.is_empty() {
-            return Ok(());
-        }
-        Err(anyhow!("failed to create kafka:{}", err_msg.join(",")).into())
-    }
-
     fn get_brokers(&self) -> &str {
         self.conf.brokers.as_str()
     }
@@ -206,5 +171,22 @@ impl OptionExt for KWConsumer {
         }
 
         Ok(guard.clone().unwrap())
+    }
+}
+
+#[async_trait::async_trait]
+impl OptionExt for KWClient {
+    type AdminClient = AdminClient<DefaultClientContext>;
+
+    fn get_brokers(&self) -> &str {
+        self.brokers.as_str()
+    }
+
+    fn get_log_level(&self) -> RDKafkaLogLevel {
+        self.get_log_level()
+    }
+
+    async fn get_admin_client(&self) -> KWResult<SafeAdminClient> {
+        Ok(self.admin_client.clone())
     }
 }
