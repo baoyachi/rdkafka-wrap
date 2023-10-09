@@ -16,6 +16,7 @@ use rdkafka::ClientConfig;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
+#[derive(Debug)]
 pub struct KWProducerConf {
     pub config: HashMap<String, String>,
     pub log_level: Option<RDKafkaLogLevel>,

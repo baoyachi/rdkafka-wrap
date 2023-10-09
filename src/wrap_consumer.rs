@@ -19,6 +19,7 @@ use tokio::sync::Mutex;
 
 pub type GroupID = String;
 
+#[derive(Debug)]
 pub struct KWConsumerConf {
     pub config: HashMap<String, String>,
     pub log_level: Option<RDKafkaLogLevel>,
