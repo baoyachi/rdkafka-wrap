@@ -1,6 +1,6 @@
 [package]
 name = "rdkafka-wrap"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["baoyachi <liaoymxsdl@gmail.com>"]
 edition = "2021"
 description = "rdkafka wrap"
@@ -27,4 +27,25 @@ tokio = { version = "1.32.0", features = ["full"] }
 [dev-dependencies]
 simple-log = "1.6.0"
 totems = "0.2.7"
+
+[features]
+default = ["rdkafka/default"]
+naive-runtime = ["rdkafka/naive-runtime"]
+cmake-build = ["rdkafka/cmake-build"]
+cmake_build = ["rdkafka/cmake_build"]
+dynamic-linking = ["rdkafka/dynamic-linking"]
+dynamic_linking = ["rdkafka/dynamic_linking"]
+ssl = ["rdkafka/ssl"]
+ssl-vendored = ["rdkafka/ssl-vendored"]
+gssapi = ["rdkafka/gssapi"]
+gssapi-vendored = ["rdkafka/gssapi-vendored"]
+sasl = ["rdkafka/sasl"]
+libz = ["rdkafka/libz"]
+libz-static = ["rdkafka/libz-static"]
+curl = ["rdkafka/curl"]
+curl-static = ["rdkafka/curl-static"]
+zstd = ["rdkafka/zstd"]
+zstd-pkg-config = ["rdkafka/zstd-pkg-config"]
+external-lz4 = ["rdkafka/external-lz4"]
+external_lz4 = ["rdkafka/external_lz4"]
 
