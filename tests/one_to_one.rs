@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::time::Duration;
 use rdkafka::admin::{NewTopic, TopicReplication};
 use rdkafka::producer::{BaseRecord, Producer};
 use rdkafka::util::Timeout;
-use tokio::time::timeout;
 use rdkafka_wrap::{KWConsumer, KWConsumerConf, KWProducer, KWProducerConf};
+use std::collections::HashMap;
+use std::time::Duration;
+use tokio::time::timeout;
 
 const BROKERS: &str = "localhost:9092";
 
@@ -13,7 +13,6 @@ async fn main() {
     simple_log::quick!();
     let topic = "test_kaka";
     let count = 10;
-
 
     tokio::spawn(async move {
         let conf = KWProducerConf {
@@ -36,12 +35,14 @@ async fn main() {
                 producer.producer.flush(None).unwrap();
                 break;
             }
-            producer.send(BaseRecord::to(topic).payload(b"hello").key("")).await.unwrap();
+            producer
+                .send(BaseRecord::to(topic).payload(b"hello").key(""))
+                .await
+                .unwrap();
             tokio::time::sleep(Duration::from_millis(100)).await;
             index += 1;
         }
     });
-
 
     let conf = KWConsumerConf {
         config: HashMap::from([
@@ -71,5 +72,5 @@ async fn main() {
             }
         }
     }
-    assert_eq!(index,count);
+    assert_eq!(index, count);
 }
