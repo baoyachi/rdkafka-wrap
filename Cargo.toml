@@ -26,7 +26,6 @@ tokio = { version = "1.32.0", features = ["full"] }
 
 [dev-dependencies]
 simple-log = "1.6.0"
-totems = "0.2.7"
 
 [features]
 default = ["rdkafka/default"]
