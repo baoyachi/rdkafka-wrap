@@ -16,6 +16,8 @@ use rdkafka::ClientConfig;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
+const CONF_NO_TOPIC: &str = "conf no topic";
+
 #[derive(Debug)]
 pub struct KWProducerConf {
     pub config: HashMap<String, String>,
@@ -119,7 +121,7 @@ impl KWProducer {
             .conf
             .topic
             .as_ref()
-            .ok_or_else(|| anyhow!("conf no topic"))?;
+            .ok_or_else(|| anyhow!(CONF_NO_TOPIC))?;
         let replica = TopicReplication::Fixed(self.conf.replication);
         Ok(NewTopic::new(topic, self.conf.num_partitions, replica))
     }
@@ -132,7 +134,6 @@ impl KWProducer {
         K: ToBytes + ?Sized,
         P: ToBytes + ?Sized,
     {
-        let topic = record.topic;
         match self.producer.send(record, self.conf.msg_timeout).await {
             Ok(_) => {
                 return Ok(());
