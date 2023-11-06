@@ -21,7 +21,7 @@ async fn main() {
             brokers: BROKERS.to_string(),
             msg_timeout: Timeout::Never,
             create_topic_conf: Some(NewTopic {
-                name: "test_kaka",
+                name: topic,
                 num_partitions: 1,
                 replication: TopicReplication::Fixed(1),
                 config: vec![],
