@@ -76,14 +76,21 @@ impl<'a> AdminClientExt for (Brokers<'a>, RDKafkaLogLevel) {
 #[async_trait::async_trait]
 pub trait OptionExt {
     type AdminClient: FromClientConfig;
-    async fn create_topic<'a, I>(&self, topics: I) -> KWResult<()>
-    where
-        I: IntoIterator<Item = &'a NewTopic<'a>> + Send,
-    {
+
+    fn get_new_topics(&self) -> KWResult<Vec<NewTopic>> {
+        Ok(vec![])
+    }
+
+    async fn create_topic(&self) -> KWResult<()> {
         let admin_client = self.get_admin_client().await?;
 
+        let new_topics = self.get_new_topics()?;
+        if new_topics.is_empty() {
+            debug!("topics is empty.skip");
+            return Ok(());
+        }
         let topics_result = admin_client
-            .create_topics(topics, &AdminOptions::new())
+            .create_topics(new_topics.as_slice(), &AdminOptions::new())
             .await?;
 
         let mut err_msg = vec![];
@@ -131,6 +138,10 @@ pub trait OptionExt {
 #[async_trait::async_trait]
 impl OptionExt for KWProducer {
     type AdminClient = AdminClient<DefaultClientContext>;
+
+    fn get_new_topics(&self) -> KWResult<Vec<NewTopic>> {
+        Ok(vec![self.new_topic()?])
+    }
 
     fn get_brokers(&self) -> &str {
         self.conf.brokers.as_str()
