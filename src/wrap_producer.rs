@@ -78,7 +78,7 @@ impl KWProducerConf {
         self
     }
 
-    pub fn set_create_topic_conf(
+    pub fn set_topic_conf(
         mut self,
         topic: impl Into<String>,
         num_partitions: i32,
