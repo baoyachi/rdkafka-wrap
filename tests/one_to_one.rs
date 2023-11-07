@@ -1,5 +1,5 @@
-use rdkafka::admin::{NewTopic, TopicReplication};
-use rdkafka::producer::{BaseRecord, Producer};
+use log::info;
+use rdkafka::producer::BaseRecord;
 use rdkafka::util::Timeout;
 use rdkafka_wrap::{KWConsumer, KWConsumerConf, KWProducer, KWProducerConf};
 use std::collections::HashMap;
@@ -20,27 +20,25 @@ async fn main() {
             log_level: None,
             brokers: BROKERS.to_string(),
             msg_timeout: Timeout::Never,
-            create_topic_conf: Some(NewTopic {
-                name: topic,
-                num_partitions: 1,
-                replication: TopicReplication::Fixed(1),
-                config: vec![],
-            }),
+            topic: Some(topic.into()),
+            num_partitions: 1,
+            replication: 1,
         };
 
         let producer = KWProducer::new(conf).unwrap();
         let mut index = 0;
         loop {
             if index >= count {
-                producer.producer.flush(None).unwrap();
+                producer.flush(None).unwrap();
+                info!("send flush");
                 break;
             }
             producer
                 .send(BaseRecord::to(topic).payload(b"hello").key(""))
                 .await
                 .unwrap();
-            tokio::time::sleep(Duration::from_millis(100)).await;
             index += 1;
+            info!("send index:{}", index);
         }
     });
 
@@ -50,20 +48,26 @@ async fn main() {
             ("enable.auto.commit".into(), "true".into()),
             ("enable.auto.offset.store".into(), "true".into()),
             ("receive.message.max.bytes".into(), "100001000".into()),
-            ("auto.offset.reset".into(), " latest".into()),
+            ("auto.offset.reset".into(), " earliest".into()),
+            ("heartbeat.interval.ms".into(), "1000".into()),
+            ("session.timeout.ms".into(), " 6000".into()),
         ]),
         log_level: None,
         group_id: "kw_test".to_string(),
         brokers: BROKERS.to_string(),
         topics: vec![topic.into()],
     };
-    let consumer = KWConsumer::new_subscribe(conf).unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let consumer = KWConsumer::new(conf).unwrap();
+    consumer.unsubscribe();
+    consumer.subscribe().unwrap();
     let mut index = 0;
     loop {
         match timeout(Duration::from_secs(3), consumer.recv()).await {
             Ok(t) => {
                 let _ = t.unwrap();
                 index += 1;
+                info!("rev index:{}", index);
             }
             Err(_) => {
                 if index != 0 {

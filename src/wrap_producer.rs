@@ -5,16 +5,18 @@ use crate::wrap_err::KWResult;
 use crate::wrap_ext::SafeAdminClient;
 use crate::{KWError, LogWrapExt, OptionExt};
 use anyhow::anyhow;
-use rdkafka::admin::NewTopic;
+use rdkafka::admin::{NewTopic, TopicReplication};
 use rdkafka::config::RDKafkaLogLevel;
 use rdkafka::error::KafkaError;
 use rdkafka::message::ToBytes;
-use rdkafka::producer::{BaseRecord, DefaultProducerContext};
+use rdkafka::producer::{BaseRecord, DefaultProducerContext, Producer};
 use rdkafka::types::RDKafkaErrorCode;
 use rdkafka::util::Timeout;
 use rdkafka::ClientConfig;
 use std::collections::HashMap;
 use tokio::sync::Mutex;
+
+const CONF_NO_TOPIC: &str = "conf no topic";
 
 #[derive(Debug)]
 pub struct KWProducerConf {
@@ -22,7 +24,9 @@ pub struct KWProducerConf {
     pub log_level: Option<RDKafkaLogLevel>,
     pub brokers: String,
     pub msg_timeout: Timeout,
-    pub create_topic_conf: Option<NewTopic<'static>>,
+    pub topic: Option<String>,
+    pub num_partitions: i32,
+    pub replication: i32,
 }
 
 impl KWProducerConf {
@@ -35,7 +39,9 @@ impl KWProducerConf {
             log_level: None,
             brokers: brokers.as_ref().to_string(),
             msg_timeout: Timeout::Never,
-            create_topic_conf: None,
+            topic: None,
+            num_partitions: 1,
+            replication: 1,
         }
     }
 
@@ -72,9 +78,15 @@ impl KWProducerConf {
         self
     }
 
-    pub fn set_create_topic_conf<'a>(mut self, topic: NewTopic<'a>) -> Self {
-        let topic = unsafe { std::mem::transmute::<NewTopic<'a>, NewTopic<'_>>(topic) };
-        self.create_topic_conf = Some(topic);
+    pub fn set_topic_conf(
+        mut self,
+        topic: impl Into<String>,
+        num_partitions: i32,
+        replication: i32,
+    ) -> Self {
+        self.topic = Some(topic.into());
+        self.num_partitions = num_partitions;
+        self.replication = replication;
         self
     }
 }
@@ -104,6 +116,16 @@ impl KWProducer {
         })
     }
 
+    pub fn new_topic(&self) -> KWResult<NewTopic> {
+        let topic = self
+            .conf
+            .topic
+            .as_ref()
+            .ok_or_else(|| anyhow!(CONF_NO_TOPIC))?;
+        let replica = TopicReplication::Fixed(self.conf.replication);
+        Ok(NewTopic::new(topic, self.conf.num_partitions, replica))
+    }
+
     pub async fn send<'a, K, P>(
         &'a self,
         record: BaseRecord<'a, K, P>,
@@ -112,21 +134,16 @@ impl KWProducer {
         K: ToBytes + ?Sized,
         P: ToBytes + ?Sized,
     {
-        let topic = record.topic;
         match self.producer.send(record, self.conf.msg_timeout).await {
             Ok(_) => {
                 return Ok(());
             }
             Err((e, record)) => {
-                if self.conf.create_topic_conf.is_some()
+                if self.conf.topic.is_some()
                     && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
                 {
-                    let topic = self
-                        .conf
-                        .create_topic_conf
-                        .as_ref()
-                        .ok_or_else(|| (anyhow!("lost topic:{} config", topic).into(), None))?;
-                    self.create_topic([topic]).await.map_err(|e| (e, None))?;
+                    let topic = self.new_topic().map_err(|e| (e, None))?;
+                    self.create_topic([&topic]).await.map_err(|e| (e, None))?;
                     self.producer
                         .send(record, self.conf.msg_timeout)
                         .await
@@ -136,6 +153,46 @@ impl KWProducer {
                 }
             }
         }
+        Ok(())
+    }
+
+    pub async fn publish<'a, K, P>(&'a self, payload: &[u8], key: &[u8]) -> KWResult<()>
+    where
+        K: ToBytes + ?Sized,
+        P: ToBytes + ?Sized,
+    {
+        let record = BaseRecord::to(
+            self.conf
+                .topic
+                .as_ref()
+                .ok_or_else(|| anyhow!(CONF_NO_TOPIC))?,
+        )
+        .payload(payload)
+        .key(key);
+        match self.producer.send(record, self.conf.msg_timeout).await {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err((e, record)) => {
+                if self.conf.topic.is_some()
+                    && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
+                {
+                    let topic = self.new_topic()?;
+                    self.create_topic([&topic]).await?;
+                    self.producer
+                        .send(record, self.conf.msg_timeout)
+                        .await
+                        .map_err(|(e, _)| e)?;
+                } else {
+                    return Err(e.into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn flush<T: Into<Timeout>>(&self, timeout: T) -> KWResult<()> {
+        self.producer.flush(timeout)?;
         Ok(())
     }
 }

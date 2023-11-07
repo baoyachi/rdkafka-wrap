@@ -158,7 +158,7 @@ impl KWConsumer {
         self.consumer.recv().await
     }
 
-    pub fn unsubscribe(&mut self) {
+    pub fn unsubscribe(&self) {
         self.consumer.unsubscribe();
     }
 
