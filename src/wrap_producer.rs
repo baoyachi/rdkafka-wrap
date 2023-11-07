@@ -142,8 +142,7 @@ impl KWProducer {
                 if self.conf.topic.is_some()
                     && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
                 {
-                    let topic = self.new_topic().map_err(|e| (e, None))?;
-                    self.create_topic([&topic]).await.map_err(|e| (e, None))?;
+                    self.create_topic().await.map_err(|e| (e, None))?;
                     self.producer
                         .send(record, self.conf.msg_timeout)
                         .await
@@ -173,8 +172,7 @@ impl KWProducer {
                 if self.conf.topic.is_some()
                     && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
                 {
-                    let topic = self.new_topic()?;
-                    self.create_topic([&topic]).await?;
+                    self.create_topic().await?;
                     self.producer
                         .send(record, self.conf.msg_timeout)
                         .await
