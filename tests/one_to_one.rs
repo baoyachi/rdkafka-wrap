@@ -30,15 +30,15 @@ async fn main() {
         loop {
             if index >= count {
                 producer.flush(None).unwrap();
+                info!("send flush");
                 break;
             }
             producer
                 .send(BaseRecord::to(topic).payload(b"hello").key(""))
                 .await
                 .unwrap();
-            info!("send:{}", index);
-            tokio::time::sleep(Duration::from_millis(100)).await;
             index += 1;
+            info!("send index:{}", index);
         }
     });
 
@@ -48,21 +48,26 @@ async fn main() {
             ("enable.auto.commit".into(), "true".into()),
             ("enable.auto.offset.store".into(), "true".into()),
             ("receive.message.max.bytes".into(), "100001000".into()),
-            ("auto.offset.reset".into(), " latest".into()),
+            ("auto.offset.reset".into(), " earliest".into()),
+            ("heartbeat.interval.ms".into(), "1000".into()),
+            ("session.timeout.ms".into(), " 6000".into()),
         ]),
         log_level: None,
         group_id: "kw_test".to_string(),
         brokers: BROKERS.to_string(),
         topics: vec![topic.into()],
     };
-    let consumer = KWConsumer::new_subscribe(conf).unwrap();
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    let consumer = KWConsumer::new(conf).unwrap();
+    consumer.unsubscribe();
+    consumer.subscribe().unwrap();
     let mut index = 0;
     loop {
         match timeout(Duration::from_secs(3), consumer.recv()).await {
             Ok(t) => {
                 let _ = t.unwrap();
                 index += 1;
-                info!("index:{}", index);
+                info!("rev index:{}", index);
             }
             Err(_) => {
                 if index != 0 {
