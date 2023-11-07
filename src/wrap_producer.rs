@@ -156,7 +156,42 @@ impl KWProducer {
         Ok(())
     }
 
-    fn flush<T: Into<Timeout>>(&self, timeout: T) -> KWResult<()> {
+    pub async fn publish<'a, K, P>(&'a self, payload: &[u8], key: &[u8]) -> KWResult<()>
+    where
+        K: ToBytes + ?Sized,
+        P: ToBytes + ?Sized,
+    {
+        let record = BaseRecord::to(
+            self.conf
+                .topic
+                .as_ref()
+                .ok_or_else(|| anyhow!(CONF_NO_TOPIC))?,
+        )
+        .payload(payload)
+        .key(key);
+        match self.producer.send(record, self.conf.msg_timeout).await {
+            Ok(_) => {
+                return Ok(());
+            }
+            Err((e, record)) => {
+                if self.conf.topic.is_some()
+                    && e == KafkaError::MessageProduction(RDKafkaErrorCode::UnknownTopic)
+                {
+                    let topic = self.new_topic()?;
+                    self.create_topic([&topic]).await?;
+                    self.producer
+                        .send(record, self.conf.msg_timeout)
+                        .await
+                        .map_err(|(e, _)| e)?;
+                } else {
+                    return Err(e.into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn flush<T: Into<Timeout>>(&self, timeout: T) -> KWResult<()> {
         self.producer.flush(timeout)?;
         Ok(())
     }

@@ -1,5 +1,5 @@
-use rdkafka::admin::{NewTopic, TopicReplication};
-use rdkafka::producer::{BaseRecord, Producer};
+use log::info;
+use rdkafka::producer::BaseRecord;
 use rdkafka::util::Timeout;
 use rdkafka_wrap::{KWConsumer, KWConsumerConf, KWProducer, KWProducerConf};
 use std::collections::HashMap;
@@ -20,25 +20,23 @@ async fn main() {
             log_level: None,
             brokers: BROKERS.to_string(),
             msg_timeout: Timeout::Never,
-            create_topic_conf: Some(NewTopic {
-                name: topic,
-                num_partitions: 1,
-                replication: TopicReplication::Fixed(1),
-                config: vec![],
-            }),
+            topic: Some(topic.into()),
+            num_partitions: 1,
+            replication: 1,
         };
 
         let producer = KWProducer::new(conf).unwrap();
         let mut index = 0;
         loop {
             if index >= count {
-                producer.producer.flush(None).unwrap();
+                producer.flush(None).unwrap();
                 break;
             }
             producer
                 .send(BaseRecord::to(topic).payload(b"hello").key(""))
                 .await
                 .unwrap();
+            info!("send:{}", index);
             tokio::time::sleep(Duration::from_millis(100)).await;
             index += 1;
         }
@@ -64,6 +62,7 @@ async fn main() {
             Ok(t) => {
                 let _ = t.unwrap();
                 index += 1;
+                info!("index:{}", index);
             }
             Err(_) => {
                 if index != 0 {
