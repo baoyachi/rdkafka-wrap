@@ -156,11 +156,7 @@ impl KWProducer {
         Ok(())
     }
 
-    pub async fn publish<'a, K, P>(&'a self, payload: &[u8], key: &[u8]) -> KWResult<()>
-    where
-        K: ToBytes + ?Sized,
-        P: ToBytes + ?Sized,
-    {
+    pub async fn publish(&self, payload: &[u8], key: &[u8]) -> KWResult<()> {
         let record = BaseRecord::to(
             self.conf
                 .topic
