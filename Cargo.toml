@@ -1,6 +1,6 @@
 [package]
 name = "rdkafka-wrap"
-version = "0.1.10"
+version = "0.1.11"
 authors = ["baoyachi <liaoymxsdl@gmail.com>"]
 edition = "2021"
 description = "rdkafka wrap"
