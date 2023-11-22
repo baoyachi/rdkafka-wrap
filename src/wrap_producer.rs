@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 
 const CONF_NO_TOPIC: &str = "conf no topic";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KWProducerConf {
     pub config: HashMap<String, String>,
     pub log_level: Option<RDKafkaLogLevel>,
