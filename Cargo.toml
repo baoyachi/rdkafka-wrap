@@ -16,7 +16,7 @@ exclude = [".github"]
 
 
 [dependencies]
-rdkafka = "0.33.0"
+rdkafka = "0.36.0"
 log = "0.4.18"
 anyhow = "1.0.71"
 thiserror = "1.0.47"
