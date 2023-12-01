@@ -16,19 +16,22 @@ async fn main() {
     let args: Vec<_> = std::env::args().collect();
 
     let BROKERS = args.get(1).unwrap();
+    // let BROKERS = BROKERS
     let topic = args.get(2).unwrap();
     let timeout_duration = args.get(3).map(|x| x.parse::<u64>().unwrap_or(20)).unwrap_or(20);
     info!("brokers:{}",BROKERS);
     info!("topic:{}",topic);
+    info!("timeout_duration:{}",timeout_duration);
 
     let topic = "test_kaka";
     let count = 10;
 
+    let brokers = BROKERS.clone();
     tokio::spawn(async move {
         let conf = KWProducerConf {
             config: Default::default(),
             log_level: None,
-            brokers: BROKERS.to_string(),
+            brokers,
             msg_timeout: Timeout::Never,
             topic: Some(topic.into()),
             num_partitions: 1,
