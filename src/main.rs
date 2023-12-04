@@ -23,17 +23,18 @@ async fn main() {
     info!("topic:{}",topic);
     info!("timeout_duration:{}",timeout_duration);
 
-    let topic = "test_kaka";
+    // let topic = "test_kaka";
     let count = 10;
 
     let brokers = BROKERS.clone();
+    let tmp_topic = topic.clone();
     tokio::spawn(async move {
         let conf = KWProducerConf {
             config: Default::default(),
             log_level: None,
             brokers,
             msg_timeout: Timeout::Never,
-            topic: Some(topic.into()),
+            topic: Some(tmp_topic.clone()),
             num_partitions: 1,
             replication: 1,
         };
@@ -47,7 +48,7 @@ async fn main() {
                 break;
             }
             producer
-                .send(BaseRecord::to(topic).payload(b"hello").key(""))
+                .send(BaseRecord::to(&tmp_topic).payload(b"hello").key(""))
                 .await
                 .unwrap();
             index += 1;
